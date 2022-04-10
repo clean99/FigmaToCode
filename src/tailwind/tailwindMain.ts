@@ -12,6 +12,8 @@ import { tailwindVector } from "./vector";
 import { TailwindTextBuilder } from "./tailwindTextBuilder";
 import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
 import { retrieveTopFill } from "../common/retrieveFill";
+import { isUI, recognizeAntdUI } from "../common/recognizeUI";
+import { nodesTraverserGenerator } from "../common/traversalUtils";
 
 let parentId = "";
 let showLayerName = false;
@@ -20,12 +22,13 @@ export const tailwindMain = (
   sceneNode: Array<AltSceneNode>,
   parentIdSrc: string = "",
   isJsx: boolean = false,
-  layerName: boolean = false
+  layerName: boolean = false,
+  recognize: boolean = false
 ): string => {
   parentId = parentIdSrc;
   showLayerName = layerName;
-
-  let result = tailwindWidgetGenerator(sceneNode, isJsx);
+  console.log(recognize);
+  let result = tailwindWidgetGenerator(sceneNode, isJsx, recognize);
 
   // remove the initial \n that is made in Container.
   if (result.length > 0 && result.slice(0, 1) === "\n") {
@@ -38,14 +41,15 @@ export const tailwindMain = (
 // todo lint idea: replace BorderRadius.only(topleft: 8, topRight: 8) with BorderRadius.horizontal(8)
 const tailwindWidgetGenerator = (
   sceneNode: ReadonlyArray<AltSceneNode>,
-  isJsx: boolean
+  isJsx: boolean,
+  recognize: boolean
 ): string => {
   let comp = "";
-
   // filter non visible nodes. This is necessary at this step because conversion already happened.
   const visibleSceneNode = sceneNode.filter((d) => d.visible !== false);
 
   visibleSceneNode.forEach((node) => {
+    console.log(node.name,node.type)
     if (node.type === "RECTANGLE" || node.type === "ELLIPSE") {
       comp += tailwindContainer(
         node,
@@ -55,9 +59,9 @@ const tailwindWidgetGenerator = (
         isJsx
       );
     } else if (node.type === "GROUP") {
-      comp += tailwindGroup(node, isJsx);
+      comp += tailwindGroup(node, isJsx, recognize);
     } else if (node.type === "FRAME") {
-      comp += tailwindFrame(node, isJsx);
+      comp += tailwindFrame(node, isJsx, recognize);
     } else if (node.type === "TEXT") {
       comp += tailwindText(node, false, isJsx);
     }
@@ -68,7 +72,7 @@ const tailwindWidgetGenerator = (
   return comp;
 };
 
-const tailwindGroup = (node: AltGroupNode, isJsx: boolean = false): string => {
+const tailwindGroup = (node: AltGroupNode, isJsx: boolean = false, recognize: boolean): string => {
   // ignore the view when size is zero or less
   // while technically it shouldn't get less than 0, due to rounding errors,
   // it can get to values like: -0.000004196293048153166
@@ -76,7 +80,6 @@ const tailwindGroup = (node: AltGroupNode, isJsx: boolean = false): string => {
   if (node.width <= 0 || node.height <= 0 || node.children.length === 0) {
     return "";
   }
-
   const vectorIfExists = tailwindVector(node, showLayerName, parentId, isJsx);
   if (vectorIfExists) return vectorIfExists;
 
@@ -85,16 +88,24 @@ const tailwindGroup = (node: AltGroupNode, isJsx: boolean = false): string => {
     .blend(node)
     .widthHeight(node)
     .position(node, parentId);
-
   if (builder.attributes || builder.style) {
     const attr = builder.build("relative ");
-
-    const generator = tailwindWidgetGenerator(node.children, isJsx);
+    if (recognize && isUI(node.name)) {
+    const nodesTraverse = nodesTraverserGenerator(Array.isArray(node)?node:[node])
+    let text = '';
+    const getText = (node:AltTextNode) => {
+      text = node.characters;
+    }
+    nodesTraverse.traverseNodes("TEXT",getText)
+    return recognizeAntdUI(node.name,text);
+      
+    }
+    const generator = tailwindWidgetGenerator(node.children, isJsx, recognize);
 
     return `\n<div${attr}>${indentString(generator)}\n</div>`;
   }
 
-  return tailwindWidgetGenerator(node.children, isJsx);
+  return tailwindWidgetGenerator(node.children, isJsx, recognize);
 };
 
 const tailwindText = (
@@ -133,10 +144,19 @@ const tailwindText = (
   }
 };
 
-const tailwindFrame = (node: AltFrameNode, isJsx: boolean): string => {
+const tailwindFrame = (node: AltFrameNode, isJsx: boolean, recognize: boolean): string => {
   // const vectorIfExists = tailwindVector(node, isJsx);
   // if (vectorIfExists) return vectorIfExists;
-
+  
+  if (recognize && isUI(node.name)) {
+    const nodesTraverse = nodesTraverserGenerator(Array.isArray(node)?node:[node])
+    let text = '';
+    const getText = (node:AltTextNode) => {
+      text = node.characters;
+    }
+    nodesTraverse.traverseNodes("TEXT",getText)
+    return recognizeAntdUI(node.name,text);
+  }
   if (
     node.children.length === 1 &&
     node.children[0].type === "TEXT" &&
@@ -152,7 +172,7 @@ const tailwindFrame = (node: AltFrameNode, isJsx: boolean): string => {
     );
   }
 
-  const childrenStr = tailwindWidgetGenerator(node.children, isJsx);
+  const childrenStr = tailwindWidgetGenerator(node.children, isJsx, recognize);
 
   if (node.layoutMode !== "NONE") {
     const rowColumn = rowColumnProps(node);

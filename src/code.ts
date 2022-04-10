@@ -13,7 +13,7 @@ let parentId: string;
 let isJsx = false;
 let layerName = false;
 let material = true;
-
+let recognize = false;
 let mode: "flutter" | "swiftui" | "html" | "tailwind";
 
 figma.showUI(__html__, { width: 450, height: 550 });
@@ -43,7 +43,7 @@ const run = () => {
   if (mode === "flutter") {
     result = flutterMain(convertedSelection, parentId, material);
   } else if (mode === "tailwind") {
-    result = tailwindMain(convertedSelection, parentId, isJsx, layerName);
+    result = tailwindMain(convertedSelection, parentId, isJsx, layerName, recognize);
   } else if (mode === "swiftui") {
     result = swiftuiMain(convertedSelection, parentId);
   } else if (mode === "html") {
@@ -104,6 +104,9 @@ figma.ui.onmessage = (msg) => {
     run();
   } else if (msg.type === "material" && msg.data !== material) {
     material = msg.data;
+    run();
+  } else if (msg.type === "recognize" && msg.data !== recognize) {
+    recognize = msg.data;
     run();
   }
 };

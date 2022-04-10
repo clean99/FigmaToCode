@@ -74,7 +74,15 @@
       "*"
     );
   }
-
+  let recognize = false;
+  $: if (recognize || !recognize) {
+    parent.postMessage(
+      {
+        pluginMessage: { type: "recognize", data: recognize}
+      },
+      "*"
+    );
+  }
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
   const clipboard = data => dispatch("clipboard", { text: data });
@@ -249,6 +257,7 @@
 
         <Switch bind:checked={jsx} id="jsx" text="JSX" />
 
+        <Switch bind:checked={recognize} id="recognize" text="Recognize" />
       </div>
     </div>
     <div class="h-2" />
